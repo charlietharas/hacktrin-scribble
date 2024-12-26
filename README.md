@@ -3,7 +3,7 @@ Lets you write in the air with your pointer finger, and uses a simple neural net
 Thanks to [Jason Wu](https://github.com/abstractlegwear) & Maggie Kwan for their help with the initial version of this back in 2021!
 
 ## Installation
-`pip install opencv mediapipe tensorflow keras emnist`
+`pip install opencv-python mediapipe tensorflow keras emnist`
 
 If model weights not detected, program will attempt to generate model weights file in working directory. At time of publishing, `emnist` direct downloads are broken; follow error mesage instructions to get it to load the data.
 
