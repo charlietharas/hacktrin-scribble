@@ -1,13 +1,18 @@
-# hacktrin-scribble
-Winner for Trinity High School's Hacktrin VIII (2021) Best Overall award. Contains incomplete prototype code, not the final submission.
+Lets you write in the air with your pointer finger, and uses a simple neural net trained on EMNIST to tell you which letters you wrote!
 
-Githubs:
-- Jason Wu [@abstractlegwear](https://github.com/abstractlegwear).
+Thanks to [Jason Wu](https://github.com/abstractlegwear) & Maggie Kwan for their help with the initial version of this back in 2021!
 
-Submission video [here](https://youtu.be/qcaZ_k0h4SU).
+## Installation
+`pip install opencv mediapipe tensorflow keras emnist`
 
-This code contains the two unconnected components of our project. The first component, in the file `EdgeDetection.py`, utilizes the OpenCV library to detect fingers from a user's camera after a quick setup process and then tracks the user's tracing of their finger through the air into letters. Every time the user wishes to enter a new letter into the tracker (being done drawing the old one) the user may forcefully blink, which will clear the board and process the previous trace. 
+If model weights not detected, program will attempt to generate model weights file in working directory. At time of publishing, `emnist` direct downloads are broken; follow error mesage instructions to get it to load the data.
 
-The second compnent, located in `hacktrinv5.py`, is a letter classification model trained on the extended-MNIST "EMNIST" dataset. This model parses 28 by 28 resizes of traced lines against its training on lower and uppercase 28 by 28 letters and numbers, and then output the result.
+If it's not working the way you expect/want, the first place to start is tweaking default params in function headers.
 
-This repository does not feature the two code sections linked with each other. They currently operate independently. This code is also not optimized for independent deployment but rather as a source code storage. Big thanks to the helpful judges & staff at Hacktrin for letting us compete and setting up a wonderful event. Check them out at [their website](http://www.hacktrin.com/). Feel free to contact me or my partners via outreach at charlie@charliemax.dev.
+## Usage
+Once the model is trained, it can be reloaded from the weights file.
+
+Running will open a camera window. Simply:
+- Use your index finger to draw
+- Raise your middle finger by your index finger to finish the current letter; model predictions are printed to stdout
+- Raise your middle and ring fingers to move your hand freely without clearing the letter
