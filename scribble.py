@@ -5,6 +5,8 @@ from emnist import extract_training_samples, extract_test_samples
 from tensorflow.keras.models import load_model, Sequential # type: ignore
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Dense, Flatten, Dropout # type: ignore
 
+import tensorflowjs as tfjs
+
 class FingerPen:
     def __init__(self, camera_index, model_path, mapping_path, camera_flipped=True, hand_detect_thresh=0.7, hand_tracking_thresh=0.5):
         self.camera_flipped = camera_flipped
@@ -39,22 +41,23 @@ class FingerPen:
             print("Creating and training new model @", path)
             model = self.create_model()
             self.train(model)
+            tfjs.converters.save_keras_model(model, 'modelfile')
             model.save(path)
             return model
         
     def create_model(self):
         model = Sequential([
-            Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)),
-            MaxPooling2D((2, 2)),
-            Dropout(0.1),
-            Conv2D(64, (3, 3), activation='relu'),
-            MaxPooling2D((2, 2)),
-            Dropout(0.1),
-            Conv2D(64, (3, 3), activation='relu'),
-            Flatten(),
-            Dense(64, activation='relu'),
-            Dropout(0.05),
-            Dense(47, activation='softmax')  # balanced EMNIST has 47 characters
+            Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1), name='conv2d_1'),
+            MaxPooling2D((2, 2), name='maxpool_1'),
+            Dropout(0.1, name='dropout_1'),
+            Conv2D(64, (3, 3), activation='relu', name='conv2d_2'),
+            MaxPooling2D((2, 2), name='maxpool_2'),
+            Dropout(0.1, name='droput_2'),
+            Conv2D(64, (3, 3), activation='relu', name='conv2d_3'),
+            Flatten(name='flatten'),
+            Dense(64, activation='relu', name='dense_1'),
+            Dropout(0.05, name='dropout_3'),
+            Dense(47, activation='softmax', name='dense_2')  # balanced EMNIST has 47 characters
         ])
         
         model.compile(
