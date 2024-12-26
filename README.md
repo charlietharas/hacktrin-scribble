@@ -2,6 +2,11 @@ Lets you write in the air with your pointer finger, and uses a simple neural net
 
 Thanks to [Jason Wu](https://github.com/abstractlegwear) & Maggie Kwan for their help with the initial version of this back in 2021!
 
+## Branches
+- `main` has new Python implementation
+- `old` has archived original submission for HackTrin in 2021
+- `js` has Python implementation that saves model to web version, as well as web implementation of GUI
+
 ## Installation
 `pip install opencv-python mediapipe tensorflow keras emnist`
 
