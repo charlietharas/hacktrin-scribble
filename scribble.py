@@ -106,7 +106,7 @@ class FingerPen:
         
         return letter_img.reshape(1, 28, 28, 1)
     
-    def finger_states(self, hand, index_tip):
+    def finger_states(self, hand, index_tip, index_wrist_thresh=0.25, index_middle_thresh=0.075, index_ring_thresh=0.125):
         middle_tip = hand.landmark[self.mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
         ring_tip = hand.landmark[self.mp_hands.HandLandmark.RING_FINGER_TIP]
         wrist = hand.landmark[self.mp_hands.HandLandmark.WRIST]
@@ -117,7 +117,7 @@ class FingerPen:
         )
         
         # finger is pointing at camera if index is close to wrist in 2D plane; draw
-        if index_wrist_dist < 0.25:
+        if index_wrist_dist < index_wrist_thresh:
             return True, False, False
         
         # now we can assume index is raised (since it is far from the wrist)
@@ -126,7 +126,7 @@ class FingerPen:
             np.array([middle_tip.x, middle_tip.y]))
                 
         # middle not raised; draw
-        if index_middle_dist > 0.075:
+        if index_middle_dist > index_middle_thresh:
             return True, False, False
 
         index_ring_dist = np.linalg.norm(
@@ -134,7 +134,7 @@ class FingerPen:
             np.array([ring_tip.x, ring_tip.y]))
         
         # midle raised but ring not; segment to next letter
-        if index_ring_dist > 0.125:
+        if index_ring_dist > index_ring_thresh:
             return True, True, False
         # middle and ring raised; do not draw but allow hand movement within letter
         else:
@@ -148,6 +148,7 @@ class FingerPen:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.hands.process(rgb_frame)
         
+        # TODO support 2 hands at once?
         if results.multi_hand_landmarks:
             hand = results.multi_hand_landmarks[0]
 
@@ -180,6 +181,7 @@ class FingerPen:
                         pred = self.model.predict(letter_img, verbose=0)
                         pred_char = self.char_map.get(np.argmax(pred), '???')
                         print(f"Detected: {pred_char}")
+                        # TODO letter error correction via whole-word prediction (basically, spell check)
                     self.letter_points = [[]]
                 self.last_point = None
             
