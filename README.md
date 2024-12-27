@@ -4,6 +4,7 @@ Thanks to [Jason Wu](https://github.com/abstractlegwear) & Maggie Kwan for their
 
 ## Installation
 `pip install tensorflowjs tensorflow==2.15.0 tensorflow-decision-forests==1.8.1`
+
 `pip install -I opencv-python mediapipe emnist`
 
 If model weights not detected, program will attempt to generate model weights file in working directory. At time of publishing, `emnist` direct downloads are broken; follow error mesage instructions to get it to load the data.
