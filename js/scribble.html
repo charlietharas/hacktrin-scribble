@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Finger Pen Web</title>
+    <title>scribble</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.22.0/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js"></script>
+
     <style>
         .container {
             max-width: 800px;
@@ -35,12 +38,20 @@
             border-radius: 8px;
             margin: 20px 0;
         }
+        #debug {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border: 1px solid black;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Finger Pen Web</h1>
         <div class="instructions">
+            <h1>Scribble</h1>
             <p>✌️ Index finger up to write</p>
             <p>✌️ Index and middle up for next letter</p>
             <p>✌️ Index and middle and ring up to move without writing</p>
@@ -50,6 +61,7 @@
             <canvas id="canvas"></canvas>
         </div>
         <div class="prediction" id="prediction"></div>
+        <div id="debug"></div>
     </div>
 
     <script>
@@ -59,29 +71,45 @@
                 this.canvas = document.getElementById('canvas');
                 this.ctx = this.canvas.getContext('2d');
                 this.prediction = document.getElementById('prediction');
+                this.debug = document.getElementById('debug');
                 
                 this.letterPoints = [[]];
                 this.lastPoint = null;
-                this.handModel = null;
                 this.model = null;
+                
+                this.hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    }
+                });
+                
+                this.hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
                 
                 this.init();
             }
 
             async init() {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { width: 640, height: 480 }
-                    });
-                    this.video.srcObject = stream;
-                    
                     this.canvas.width = 640;
                     this.canvas.height = 480;
                     
-                    this.handModel = await handpose.load();
-                    this.model = await tf.loadLayersModel('model.json');
+                    this.hands.onResults(results => this.onResults(results));
                     
-                    this.processFrame();
+                    const camera = new Camera(this.video, {
+                        onFrame: async () => {
+                            await this.hands.send({image: this.video});
+                        },
+                        width: 640,
+                        height: 480
+                    });
+                    camera.start();
+                    
+                    this.model = await tf.loadLayersModel('model.json');
                 } catch (error) {
                     console.error('Error initializing:', error);
                 }
@@ -94,47 +122,57 @@
 
                     lines.forEach(line => {
                         if (line.trim() !== "") {
-                        const [c, v] = line.trim().split(' ');
-                        this.charMap[parseInt(c, 10)] = String.fromCharCode(parseInt(v, 10));
+                            const [c, v] = line.trim().split(' ');
+                            this.charMap[parseInt(c, 10)] = String.fromCharCode(parseInt(v, 10));
                         }
                     });
                 } catch (error) {
-                    console.error("Could not load mapping.txt file")
+                    console.error("Could not load mapping.txt file");
                 }
-
             }
 
             preprocessLetter(points) {
                 if (points.length < 2) return null;
                 
+                const CANVAS_SIZE = 280;
                 const minX = Math.min(...points.map(p => p[0]));
                 const maxX = Math.max(...points.map(p => p[0]));
                 const minY = Math.min(...points.map(p => p[1]));
                 const maxY = Math.max(...points.map(p => p[1]));
                 
-                const padding = 20;
-                const width = Math.max(maxX - minX + 2 * padding, 1);
-                const height = Math.max(maxY - minY + 2 * padding, 1);
+                const width = maxX - minX;
+                const height = maxY - minY;
+                const scale = Math.min(
+                    (CANVAS_SIZE * 0.8) / width,
+                    (CANVAS_SIZE * 0.8) / height
+                );
                 
                 const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = width;
-                tempCanvas.height = height;
+                tempCanvas.width = CANVAS_SIZE;
+                tempCanvas.height = CANVAS_SIZE;
                 const tempCtx = tempCanvas.getContext('2d');
                 
                 tempCtx.fillStyle = 'black';
-                tempCtx.fillRect(0, 0, width, height);
+                tempCtx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                
+                const centerX = (CANVAS_SIZE - width * scale) / 2;
+                const centerY = (CANVAS_SIZE - height * scale) / 2;
                 
                 tempCtx.strokeStyle = 'white';
-                tempCtx.lineWidth = 2;
+                tempCtx.lineWidth = 20;
+                tempCtx.lineCap = 'round';
+                tempCtx.lineJoin = 'round';
                 tempCtx.beginPath();
                 
                 points.forEach((point, i) => {
-                    const x = point[0] - minX + padding;
-                    const y = point[1] - minY + padding;
+                    const x = CANVAS_SIZE - ((point[0] - minX) * scale + centerX);
+                    const y = (point[1] - minY) * scale + centerY;
                     if (i === 0) tempCtx.moveTo(x, y);
                     else tempCtx.lineTo(x, y);
                 });
                 tempCtx.stroke();
+                
+                this.debug.innerHTML = `<img src="${tempCanvas.toDataURL()}" style="width: 100px; height: 100px;">`;
                 
                 return tf.browser.fromPixels(tempCanvas, 1)
                     .resizeBilinear([28, 28])
@@ -142,36 +180,33 @@
                     .expandDims(0);
             }
 
-            fingerStates(hand, canvasWidth) {
-                const indexTip = hand[8];
-                const middleTip = hand[12];
-                const ringTip = hand[16];
-                const wrist = hand[0];
+            fingerStates(landmarks) {
+                const indexTip = landmarks[8];
+                const middleTip = landmarks[12];
+                const ringTip = landmarks[16];
+                const wrist = landmarks[0];
                 
-                const indexWristDist = Math.hypot(indexTip[0] - wrist[0], indexTip[1] - wrist[1]);
-                if (indexWristDist < 0.25 * canvasWidth) return [true, false, false];
+                const indexWristDist = Math.hypot(indexTip.x - wrist.x, indexTip.y - wrist.y);
+                if (indexWristDist < 0.25) return [true, false, false];
                 
-                const indexMiddleDist = Math.hypot(indexTip[0] - middleTip[0], indexTip[1] - middleTip[1]);
-                if (indexMiddleDist > 0.075 * canvasWidth) return [true, false, false];
+                const indexMiddleDist = Math.hypot(indexTip.x - middleTip.x, indexTip.y - middleTip.y);
+                if (indexMiddleDist > 0.075) return [true, false, false];
                 
-                const indexRingDist = Math.hypot(indexTip[0] - ringTip[0], indexTip[1] - ringTip[1]);
-                return indexRingDist > 0.125 * canvasWidth ? [true, true, false] : [true, true, true];
+                const indexRingDist = Math.hypot(indexTip.x - ringTip.x, indexTip.y - ringTip.y);
+                return indexRingDist > 0.125 ? [true, true, false] : [true, true, true];
             }
 
-            async processFrame() {
-                if (!this.handModel || !this.model) return;
-                
-                const hands = await this.handModel.estimateHands(this.video);
+            async onResults(results) {
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 
-                if (hands.length > 0) {
-
-                    const hand = hands[0].landmarks;
-                    const indexTip = hand[8];
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const landmarks = results.multiHandLandmarks[0];
+                    const indexTip = landmarks[8];
                     
-                    var [indexRaised, middleRaised, ringRaised] = this.fingerStates(hand, this.canvas.width);
-                    const x = indexTip[0];
-                    const y = indexTip[1];
+                    const x = indexTip.x * this.canvas.width;
+                    const y = indexTip.y * this.canvas.height;
+                    
+                    var [indexRaised, middleRaised, ringRaised] = this.fingerStates(landmarks);
                     
                     if (indexRaised && !middleRaised && !ringRaised) {
                         if (this.lastPoint) {
@@ -198,9 +233,9 @@
                 }
 
                 let lastLetter = this.letterPoints[this.letterPoints.length - 1];
-
-                this.ctx.strokeStyle = 'green';
-                this.ctx.lineWidth = 2;
+                
+                this.ctx.strokeStyle = 'lawnGreen';
+                this.ctx.lineWidth = 5;
                 for (let i = 0; i < lastLetter.length - 1; i++) {
                     let x0 = lastLetter[i][0];
                     let y0 = lastLetter[i][1];
@@ -212,8 +247,6 @@
                     this.ctx.lineTo(x1, y1);
                     this.ctx.stroke();
                 }
-                
-                requestAnimationFrame(() => this.processFrame());
             }
         }
 
